@@ -45,25 +45,25 @@ if np_version >= 2:
 #
 # $$
 #   \begin{align*}
-#     g_1 &= X \otimes Z \otimes Z \otimes X \otimes \mathbb{I}. \\
-#     g_2 &= \mathbb{I} \otimes X \otimes Z \otimes Z \otimes X ,\\
-#     g_3 &= X \otimes \mathbb{I} \otimes X \otimes Z \otimes Z ,\\
-#     g_4 &= Z \otimes X \otimes \mathbb{I} \otimes X \otimes Z, \\
+#     g_0 &= X \otimes Z \otimes Z \otimes X \otimes \mathbb{I}. \\
+#     g_1 &= \mathbb{I} \otimes X \otimes Z \otimes Z \otimes X ,\\
+#     g_2 &= X \otimes \mathbb{I} \otimes X \otimes Z \otimes Z ,\\
+#     g_3 &= Z \otimes X \otimes \mathbb{I} \otimes X \otimes Z, \\
 #   \end{align*}
 # $$
 
 # %%
-g_gates = {
-    1: ["x", "i", "x", "z", "z"],
-    2: ["z", "x", "i", "x", "z"],
-    3: ["x", "z", "z", "x", "i"],
-    4: ["i", "x", "z", "z", "x"],
-}
+g_gates_str = [
+    ["x", "i", "x", "z", "z"],
+    ["z", "x", "i", "x", "z"],
+    ["x", "z", "z", "x", "i"],
+    ["i", "x", "z", "z", "x"],
+]
 
 # %%
-g = {}
+g = []
 
-for i, gates in g_gates.items():
+for gates in g_gates_str:
     quantum_register = QuantumRegister(size=len(gates), name="x")
     circuit = QuantumCircuit(quantum_register)
     for j, gate in enumerate(gates):
@@ -71,7 +71,7 @@ for i, gates in g_gates.items():
             circuit.x(j)
         elif gate == "z":
             circuit.z(j)
-    g[i] = circuit
+    g.append(circuit)
 
 # %%
 i = 2
@@ -185,7 +185,7 @@ quantum_register_1 = QuantumRegister(size=5, name="x")
 set_1 = QuantumCircuit(quantum_register_1)
 set_1.x(-1)
 
-for i, gi in g.items():
+for i, gi in enumerate(g):
     output_0 = Statevector(encoder_circ.compose(gi))
     output_1 = Statevector(set_1.compose(encoder_circ.compose(gi)))
 
@@ -201,27 +201,31 @@ else:
 # ## Error Correction
 
 # %%
-register_size = len(g[0][1])
-checks_size = len(g)
+register_size = len(g_gates_str[0])
+checks_size = len(g_gates_str)
 
 quantum_register = QuantumRegister(size=register_size, name="x")
 checks_register = QuantumRegister(size=checks_size, name="c")
 
 code_circuit = QuantumCircuit(quantum_register, checks_register)
 
-for i, gates in g_gates.items():
+for i, gates in enumerate(g_gates_str):
     for j, gate in enumerate(gates):
         if gate == "x":
-            code_circuit.cx(j, i + )
+            code_circuit.cx(quantum_register[j], checks_register[i])
     if "z" in gates:
-        code_circuit.h(i + 5)
+        code_circuit.h(checks_register[i])
         for j, gate in enumerate(gates):
             if gate == "z":
-                code_circuit.cx(i + 5, j)
-        code_circuit.h(i + 5)
+                code_circuit.cx(checks_register[i], quantum_register[j])
+        code_circuit.h(checks_register[i])
     code_circuit.barrier()
 
 code_circuit.draw("mpl")
+
+# %%
+
+# %%
 
 # %%
 syndromes = ClassicalRegister(size=5, name="s")
