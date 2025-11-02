@@ -96,14 +96,14 @@ We follow a clever construction from [Stack Exchange](https://quantumcomputing.s
 quantum_register = QuantumRegister(size=5, name="x")
 encoder_circ = QuantumCircuit(quantum_register)
 
-encoder_circ.h(quantum_register[:-1])
-encoder_circ.z(-1)
+encoder_circ.z(0)
+encoder_circ.h(quantum_register[1:])
 for i in range(4):
-    encoder_circ.cx(i, 4)
+    encoder_circ.cx(4 - i, 0)
 encoder_circ.cz(0, 4)
-for i in range(0, 4, 2):
-    encoder_circ.cz(i, i + 1)
 for i in range(1, 5, 2):
+    encoder_circ.cz(i, i + 1)
+for i in range(0, 4, 2):
     encoder_circ.cz(i, i + 1)
 
 encoder_circ.draw("mpl")
@@ -157,7 +157,7 @@ To encode $\left| 1_L \right\rangle$ we need to use $\left| 0 \right\rangle^{\ot
 quantum_register = QuantumRegister(size=5, name="x")
 circ = QuantumCircuit(quantum_register)
 
-circ.x(-1)
+circ.x(0)
 circ.compose(encoder_circ, inplace=True)
 
 circ.draw("mpl")
@@ -196,7 +196,7 @@ Let's test against the $g_i$'s:
 ```{code-cell} ipython3
 quantum_register_1 = QuantumRegister(size=5, name="x")
 set_1 = QuantumCircuit(quantum_register_1)
-set_1.x(-1)
+set_1.x(0)
 
 for i, gi in enumerate(g):
     output_0 = Statevector(encoder_circ.compose(gi))
@@ -343,13 +343,15 @@ qubit_measurements = ClassicalRegister(size=5, name="meas")
 
 test_circuit = QuantumCircuit(quantum_register, checks_register, syndromes)
 
-test_circuit.x(quantum_register[-1])
-test_circuit.barrier()
+# encode |1> -- comment out to encode |0>
+# test_circuit.x(quantum_register[0])
+# test_circuit.barrier()
 
 test_circuit.compose(encoder_circ, inplace=True)
 test_circuit.barrier()
 
-test_circuit.x(quantum_register[2])
+# error to be added
+test_circuit.y(quantum_register[1])
 test_circuit.barrier()
 
 test_circuit.compose(code_test, inplace=True)
@@ -390,8 +392,8 @@ counts.keys()
 ## Two Qubit Encoding/Decoding and Test
 
 ```{code-cell} ipython3
-p = 0.15
-qubits_str = "10"
+p = 0.0
+qubits_str = "11"
 
 #######################
 n_qubits = 5
@@ -410,7 +412,7 @@ test_circuit = QuantumCircuit(
 # set initial state
 for i in range(2):
     if qubits_str[i] == "1":
-        test_circuit.x(quantum_register[(i + 1) * n_qubits - 1])
+        test_circuit.x(quantum_register[i * n_qubits])
 test_circuit.barrier()
 
 # encoders
@@ -420,21 +422,28 @@ for i in range(2):
     )
     test_circuit.barrier()
 
-error_occurred = ""
 # random errors
+error_occurred = ["i"] * (2 * n_qubits)
 for i in range(2 * n_qubits):
-    rnd = np.random.random()
-    if rnd < p:
-        error_gate = np.random.choice(["x", "y", "z"])
-        error_occurred += error_gate
-        if error_gate == "x":
-            test_circuit.x(quantum_register[i])
-        elif error_gate == "y":
-            test_circuit.y(quantum_register[i])
+    rnd = np.random.random(3)
+    # X error
+    if rnd[0] < p:
+        test_circuit.x(quantum_register[i])
+        error_occurred[i] = "x"
+    # Y error
+    if rnd[1] < p:
+        test_circuit.y(quantum_register[i])
+        if error_occurred[i] == "i":
+            error_occurred[i] = "y"
         else:
-            test_circuit.z(quantum_register[i])
-    else:
-        error_occurred += "i"
+            error_occurred[i] += "y"
+    # Z error
+    if rnd[2] < p:
+        test_circuit.z(quantum_register[i])
+        if error_occurred[i] == "i":
+            error_occurred[i] = "z"
+        else:
+            error_occurred[i] += "z"
 
 test_circuit.barrier()
 
@@ -535,7 +544,7 @@ def test_5_qubit_code(qubits_str, p, shots=20):
     # set initial state
     for i in range(2):
         if qubits_str[i] == "1":
-            test_circuit.x(quantum_register[(i + 1) * n_qubits - 1])
+            test_circuit.x(quantum_register[i * n_qubits])
 
     # encoders
     for i in range(2):
@@ -546,20 +555,27 @@ def test_5_qubit_code(qubits_str, p, shots=20):
         )
 
     # random errors
-    error_occurred = ""
+    error_occurred = ["i"] * (2 * n_qubits)
     for i in range(2 * n_qubits):
-        rnd = np.random.random()
-        if rnd < p:
-            error_gate = np.random.choice(["x", "y", "z"])
-            error_occurred += error_gate
-            if error_gate == "x":
-                test_circuit.x(quantum_register[i])
-            elif error_gate == "y":
-                test_circuit.y(quantum_register[i])
+        rnd = np.random.random(3)
+        # X error
+        if rnd[0] < p:
+            test_circuit.x(quantum_register[i])
+            error_occurred[i] = "x"
+        # Y error
+        if rnd[1] < p:
+            test_circuit.y(quantum_register[i])
+            if error_occurred[i] == "i":
+                error_occurred[i] = "y"
             else:
-                test_circuit.z(quantum_register[i])
-        else:
-            error_occurred += "i"
+                error_occurred[i] += "y"
+        # Z error
+        if rnd[2] < p:
+            test_circuit.z(quantum_register[i])
+            if error_occurred[i] == "i":
+                error_occurred[i] = "z"
+            else:
+                error_occurred[i] += "z"
 
     # encoding + correction
     # NEEDS code_circuit TO BE CONSTRUCTED FIRST!
@@ -631,24 +647,20 @@ def test_5_qubit_code(qubits_str, p, shots=20):
 
     # check
     for res, qubit in zip(result_split, list(qubits_str)):
-        if res != "0" * (n_qubits - 1) + qubit:
+        if res != qubit + "0" * (n_qubits - 1):
             return False, error_occurred
 
     return True, error_occurred
 ```
 
 ```{code-cell} ipython3
-test_5_qubit_code("11", 0.1)
-```
-
-```{code-cell} ipython3
-"".join(np.random.choice(["0", "1"], 2))
+test_5_qubit_code("11", 0.05)
 ```
 
 ```{code-cell} ipython3
 %%time
-max_prob = 0.3
-step = 0.025
+max_prob = 0.2
+step = 0.01
 
 xs = np.arange(0, max_prob + step, step)
 ys = np.zeros_like(xs)

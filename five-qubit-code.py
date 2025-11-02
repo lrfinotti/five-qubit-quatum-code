@@ -406,21 +406,28 @@ for i in range(2):
     )
     test_circuit.barrier()
 
-error_occurred = ""
 # random errors
+error_occurred = ["i"] * (2 * n_qubits)
 for i in range(2 * n_qubits):
-    rnd = np.random.random()
-    if rnd < p:
-        error_gate = np.random.choice(["x", "y", "z"])
-        error_occurred += error_gate
-        if error_gate == "x":
-            test_circuit.x(quantum_register[i])
-        elif error_gate == "y":
-            test_circuit.y(quantum_register[i])
+    rnd = np.random.random(3)
+    # X error
+    if rnd[0] < p:
+        test_circuit.x(quantum_register[i])
+        error_occurred[i] = "x"
+    # Y error
+    if rnd[1] < p:
+        test_circuit.y(quantum_register[i])
+        if error_occurred[i] == "i":
+            error_occurred[i] = "y"
         else:
-            test_circuit.z(quantum_register[i])
-    else:
-        error_occurred += "i"
+            error_occurred[i] += "y"
+    # Z error
+    if rnd[2] < p:
+        test_circuit.z(quantum_register[i])
+        if error_occurred[i] == "i":
+            error_occurred[i] = "z"
+        else:
+            error_occurred[i] += "z"
 
 test_circuit.barrier()
 
@@ -526,20 +533,27 @@ def test_5_qubit_code(qubits_str, p, shots=20):
         )
 
     # random errors
-    error_occurred = ""
+    error_occurred = ["i"] * (2 * n_qubits)
     for i in range(2 * n_qubits):
-        rnd = np.random.random()
-        if rnd < p:
-            error_gate = np.random.choice(["x", "y", "z"])
-            error_occurred += error_gate
-            if error_gate == "x":
-                test_circuit.x(quantum_register[i])
-            elif error_gate == "y":
-                test_circuit.y(quantum_register[i])
+        rnd = np.random.random(3)
+        # X error
+        if rnd[0] < p:
+            test_circuit.x(quantum_register[i])
+            error_occurred[i] = "x"
+        # Y error
+        if rnd[1] < p:
+            test_circuit.y(quantum_register[i])
+            if error_occurred[i] == "i":
+                error_occurred[i] = "y"
             else:
-                test_circuit.z(quantum_register[i])
-        else:
-            error_occurred += "i"
+                error_occurred[i] += "y"
+        # Z error
+        if rnd[2] < p:
+            test_circuit.z(quantum_register[i])
+            if error_occurred[i] == "i":
+                error_occurred[i] = "z"
+            else:
+                error_occurred[i] += "z"
 
     # encoding + correction
     # NEEDS code_circuit TO BE CONSTRUCTED FIRST!
@@ -625,8 +639,8 @@ test_5_qubit_code("11", 0.1)
 
 # %%
 # %%time
-max_prob = 0.3
-step = 0.025
+max_prob = 0.2
+step = 0.01
 
 xs = np.arange(0, max_prob + step, step)
 ys = np.zeros_like(xs)
