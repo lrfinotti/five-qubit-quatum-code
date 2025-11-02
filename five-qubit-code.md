@@ -39,7 +39,11 @@ import matplotlib.pyplot as plt
 plt.style.use("ggplot")
 ```
 
-# Five Qubit Error-Correcting Code
+# Five-Qubit Error-Correcting Code
+
++++
+
+We implement here the [Quantum Five-Qubit Error Correcting Code](https://en.wikipedia.org/wiki/Five-qubit_error_correcting_code), which is a $[[5, 1, 3]]$ code.  We then run experiments with encoded two qubits having the probability of getting a *Pauli error* (i.e., and $X$, $Y$, or $Z$ error) in each of the encoded qubits with a given probability $p$, for a few values of $p$.  So, each error, $X$, $Y$, and $Z$, has a probability of $p$ of occurring in each encoded qubits.  (Therefore, the probability of an encoded qubit having no error is $1 - 3p$.)  We present a visualization of the results.
 
 +++
 
@@ -49,7 +53,7 @@ plt.style.use("ggplot")
 
 We follow Nielsen and Chuang's [Quantum Computation and Quantum Information](https://www.cambridge.org/highereducation/books/quantum-computation-and-quantum-information/01E10196D0A682A6AEFFEA52D53BE9AE#overview), Section 10.5.6.
 
-Generators of the stabilizer group:
+The generators of the stabilizer group are:
 
 $$
   \begin{align*}
@@ -60,6 +64,8 @@ $$
   \end{align*}
 $$
 
+Let's encode this information:
+
 ```{code-cell} ipython3
 g_gates_str = [
     ["x", "z", "z", "x", "i"],
@@ -68,6 +74,8 @@ g_gates_str = [
     ["z", "x", "i", "x", "z"],
 ]
 ```
+
+Now we create the circuits for each element of the group in the list `g`:
 
 ```{code-cell} ipython3
 g = []
@@ -83,6 +91,8 @@ for gates in g_gates_str:
     g.append(circuit)
 ```
 
+Let's take a look at one of them:
+
 ```{code-cell} ipython3
 i = 2
 g[i].draw("mpl")
@@ -90,7 +100,21 @@ g[i].draw("mpl")
 
 ## Encoding
 
-We follow a clever construction from [Stack Exchange](https://quantumcomputing.stackexchange.com/)'s thread [Nielsen&Chuang 5-qubit quantum error-correction encoding gate](https://quantumcomputing.stackexchange.com/questions/14264/nielsenchuang-5-qubit-quantum-error-correction-encoding-gate).
+According to Nielsen and Chuang, the logical qubits are given by:
+
+$$
+\begin{align*}
+\left| 0 \right\rangle_L & = \phantom{+} \left|00000\right\rangle -\left|11000\right\rangle + \left|10100\right\rangle -\left|01100\right\rangle \\
+&\quad +\left|10010\right\rangle + \left|01010\right\rangle -\left|00110\right\rangle -\left|11110\right\rangle \\
+& \quad -\left|10001\right\rangle + \left|01001\right\rangle + \left|00101\right\rangle-\left|11101\right\rangle ,\\ & \quad-\left|00011\right\rangle -\left|11011\right\rangle-\left|10111\right\rangle -\left|01111\right\rangle \\
+\left| 1 \right\rangle_L &=  -\left|10000\right\rangle -\left|01000\right\rangle -\left|00100\right\rangle -\left|11100\right\rangle \\
+&\quad -\left|00010\right\rangle +\left|11010\right\rangle +\left|10110\right\rangle -\left|01110\right\rangle \\
+&\quad  -\left|00001\right\rangle -\left|11001\right\rangle +\left|10101\right\rangle +\left|01101\right\rangle \\
+&\quad -\left|10011\right\rangle +\left|01011\right\rangle -\left|00111\right\rangle +\left|11111\right\rangle.
+\end{align*}
+$$
+
+We follow a clever construction from [Stack Exchange](https://quantumcomputing.stackexchange.com/)'s thread [Nielsen&Chuang 5-qubit quantum error-correction encoding gate](https://quantumcomputing.stackexchange.com/questions/14264/nielsenchuang-5-qubit-quantum-error-correction-encoding-gate) for the encoding:
 
 ```{code-cell} ipython3
 quantum_register = QuantumRegister(size=5, name="x")
@@ -109,11 +133,13 @@ for i in range(0, 4, 2):
 encoder_circ.draw("mpl")
 ```
 
+Let's check that the coefficients are indeed correct.  We start with $\left| 0 \right\rangle_L$.
+
 ```{code-cell} ipython3
 logical_0 = Statevector(encoder_circ)
 ```
 
-Let's check that the coefficients are what we expect.  They should all be real:
+Firstly, the scalars in the linear combination should all be real:
 
 ```{code-cell} ipython3
 for x in logical_0.data:
@@ -124,12 +150,14 @@ else:
     print("All real!")
 ```
 
-They should all be $0$ or $\pm 1/4$:
+They should also all be $0$ or $\pm 1/4$:
 
 ```{code-cell} ipython3
 a = np.abs(4 * logical_0.data)
 np.all(np.isclose(a, 0) | np.isclose(a, 1))
 ```
+
+Let's print the result to compare to expected value of $\left| 0 \right\rangle_L$:
 
 ```{code-cell} ipython3
 def binary_digits(a, n):
@@ -151,7 +179,9 @@ for i, coef in enumerate(4 * logical_0.data):
         print(f"{np.rint(coef.real).astype(int):>3}: {binary_digits(i, 5)}")
 ```
 
-To encode $\left| 1_L \right\rangle$ we need to use $\left| 0 \right\rangle^{\otimes 4} \left| 0 \right\rangle$ as input:
+So, it matches!
+
+Now, we repeat the idea for $\left| 1 \right\rangle_L$.  To encode it, we need to use $\left|10000\right\rangle$ as input:
 
 ```{code-cell} ipython3
 quantum_register = QuantumRegister(size=5, name="x")
@@ -163,11 +193,13 @@ circ.compose(encoder_circ, inplace=True)
 circ.draw("mpl")
 ```
 
+Let's save the state:
+
 ```{code-cell} ipython3
 logical_1 = Statevector(circ)
 ```
 
-Let's check that the coefficients are what we expect.  They should all be real:
+Again, we check that the coefficients are all real:
 
 ```{code-cell} ipython3
 for x in logical_1.data:
@@ -178,12 +210,14 @@ else:
     print("All real!")
 ```
 
-They should all be $0$ or $\pm 1/4$:
+Now we check if they are all either $0$ or $\pm 1/4$:
 
 ```{code-cell} ipython3
 a = np.abs(4 * logical_1.data)
 np.all(np.isclose(a, 0) | np.isclose(a, 1))
 ```
+
+And we print the result to compare to the expected expression for $\left| 1 \right\rangle_L$:
 
 ```{code-cell} ipython3
 for i, coef in enumerate(4 * logical_1.data):
@@ -191,7 +225,9 @@ for i, coef in enumerate(4 * logical_1.data):
         print(f"{np.rint(coef.real).astype(int):>3}: {binary_digits(i, 5)}")
 ```
 
-Let's test against the $g_i$'s:
+Again, it matches!
+
+Finally, let's check that $\left| 0 \right\rangle_L$ and $\left| 1 \right\rangle_L$ are indeed $+1$-eigenvalues of the stabilizer group generators, i.e., the $g_i$'s:
 
 ```{code-cell} ipython3
 quantum_register_1 = QuantumRegister(size=5, name="x")
@@ -215,7 +251,40 @@ else:
 
 +++
 
-[Five and Seven Qubit Codes](https://www.physics.unlv.edu/~bernard/MATH_book/Chap9/Notebook9_3.pdf)
+We now introduce the error correction.  We follow [Bernard Zygelman](https://www.physics.unlv.edu/~bernard/)'s [Five and Seven Qubit Codes](https://www.physics.unlv.edu/~bernard/MATH_book/Chap9/Notebook9_3.pdf).
+
+The idea is that if we have a single qubit operator $M$ with eigenvalues $\pm 1$, then we can determine if an eigenvector $\left| \psi \right\rangle$ has eigenvalue $1$ or $-1$ via:
+
+<img src="M-meas.png" alt="Single Qubit Eigenvalue Flip Circuit" width="500"/>
+
+If the measurement yields $0$, then $\left| \psi \right\rangle$ has eigenvalue $+1$, and if it yields $1$, then it has eigenvalue $-1$:
+
+$$
+\begin{align*}
+\left| \psi \right\rangle \left| 0 \right\rangle
+&\mapsto \frac{1}{\sqrt{2}} \left(\left| \psi \right\rangle \left| 0 \right\rangle +  \left| \psi \right\rangle \left| 1 \right\rangle \right) \\
+&\mapsto \frac{1}{\sqrt{2}} \left(\left| \psi \right\rangle \left| 0 \right\rangle  \pm  \left| \psi \right\rangle \left| 1 \right\rangle \right) \\
+&= \left| \psi \right\rangle \otimes \frac{1}{\sqrt{2}} \left( \left| 0 \right\rangle \pm \left| 1 \right\rangle \right) \\
+&= \left| \psi \right\rangle \left| (1 - (\pm 1)) /2 \right\rangle.
+\end{align*}
+$$
+
+We can apply this to $M=X$ and $M=Z$ to detect errors.  Suppose that $g_i$ has a tensor factor of $X$ in the $j$-th qubit. Then, we have that $X_j g_i = g_i X_j$, and if $\left| \psi \right\rangle$ is a $+1$-eigenstate of $g_i$, then
+$$
+g_i \left(X_j \left| \psi \right\rangle \right) = X_j \left(g_i \left| \psi \right\rangle \right) = X_j \left| \psi \right\rangle,
+$$
+i.e., $X_j \left| \psi \right\rangle$ is also a $+1$-eigenstate, and our circuit above yields a measurement of $0$.
+
+
+On the other hand, since $XZ=-ZX$ and $XY = -YX$, we have that $U_j g_i = -g_i U_j$ for $U$ either $Z$ or $Y$, and then
+$$
+g_i \left(U_j \left| \psi \right\rangle \right) = -U_j \left(g_i \left| \psi \right\rangle \right) = -U_j \left| \psi \right\rangle,
+$$
+i.e., $U_j \left| \psi \right\rangle$ is now a $-1$-eigenstate, and our circuit above yields a measurement of $1$.
+
+Similarly, if we have instead a tensor factor of $Z$ in the $j$-th qubit, we obtain a measurement of $0$ if we have an $Z$ error in the $j$-th qubit and $1$ if we have either a $Z$ or $Y$ error.
+
+Here is the implementation:
 
 ```{code-cell} ipython3
 register_size = len(g_gates_str[0])
@@ -268,6 +337,8 @@ code_circuit.draw("mpl")
 # code_circuit.draw("mpl")
 ```
 
+Let's then add the necessary measurements:
+
 ```{code-cell} ipython3
 syndromes = ClassicalRegister(size=checks_size, name="s")
 
@@ -278,10 +349,13 @@ code_circuit.measure(checks_register, syndromes)
 code_circuit.draw("mpl")
 ```
 
+So, we can produce a table that can gives the measurements for each Pauli error:
+
 ```{code-cell} ipython3
 n_qubits = len(g_gates_str[0])
 n_syndromes = len(g_gates_str)
 
+# save table in dictionary:
 decode_dict = {}
 
 for qubit_error in ["x", "z", "y"]:  # possible errors
@@ -295,28 +369,45 @@ for qubit_error in ["x", "z", "y"]:  # possible errors
         print(f"{qubit_error}_{i}: {syndrome}")
 ```
 
+So, we have:
+
+| Error |   Measurement  | | Error |   Measurement  | | Error |   Measurement  |
+|-------|----------------|-|-------|----------------|-|-------|----------------|
+| $X_0$ | $(0, 0, 0, 1)$ | | $Z_0$ | $(1, 0, 1, 0)$ | | $Y_0$ | $(1, 0, 1, 1)$ |
+| $X_1$ | $(1, 0, 0, 0)$ | | $Z_1$ | $(0, 1, 0, 1)$ | | $Y_1$ | $(1, 1, 0, 1)$ |
+| $X_2$ | $(1, 1, 0, 0)$ | | $Z_2$ | $(0, 0, 1, 0)$ | | $Y_2$ | $(1, 1, 1, 0)$ |
+| $X_3$ | $(0, 1, 1, 0)$ | | $Z_3$ | $(1, 0, 0, 1)$ | | $Y_3$ | $(1, 1, 1, 1)$ |
+| $X_4$ | $(0, 0, 1, 1)$ | | $Z_4$ | $(0, 1, 0, 0)$ | | $Y_4$ | $(0, 1, 1, 1)$ |
+
+
+So, the measurements tell us which error occurred, and we can fix it by applying the same operator.  For instance, if we measure $(0,0,1,0)$ we apply $Z_2$ to the circuit.
+
+
+The data of the table above is saved in a dictionary:
+
 ```{code-cell} ipython3
 decode_dict
 ```
+
+We will need the `code_circuit` intact for later, so we create now a copy to test the error correction:
 
 ```{code-cell} ipython3
 code_test = code_circuit.copy()
 ```
 
-```{code-cell} ipython3
-# for error, values in decode_dict.items():
-#     with code_circuit.if_test((syndromes[0], values[0])):
-#         with code_circuit.if_test((syndromes[1], values[1])):
-#             with code_circuit.if_test((syndromes[2], values[2])):
-#                 with code_circuit.if_test((syndromes[3], values[3])):
-#                     if error[0] == "x":
-#                         code_circuit.x(error[1])
-#                     elif error[0] == "z":
-#                         code_circuit.z(error[1])
-#                     elif error[0] == "y":
-#                         code_circuit.y(error[1])
+Let's create a function that apply tests the measurements and applies the corrections:
 
-def add_5_qubit_correction(circuit, qubits, syndromes):
+```{code-cell} ipython3
+def add_5_qubit_correction(circuit, qubits, syndromes, decode_dict):
+    """
+    Adds correction for five-qubit code circuit (in-place) using a decoding table.
+
+    INPUT:
+    * circuit: the circuit containing the five-qubit code;
+    * qubtis: register for the qubits and checks;
+    * syndromes: syndromes containing the measurements;
+    * decode_dict: dictionary containing the decoding table.
+    """
     for error, values in decode_dict.items():
         with circuit.if_test((syndromes[0], values[0])):
             with circuit.if_test((syndromes[1], values[1])):
@@ -328,13 +419,27 @@ def add_5_qubit_correction(circuit, qubits, syndromes):
                             circuit.z(qubits[error[1]])
                         elif error[0] == "y":
                             circuit.y(qubits[error[1]])
+```
 
-add_5_qubit_correction(code_test, code_test.qubits[0:5], code_test.clbits)
+Let's then add corrections to `code_test`:
+
+```{code-cell} ipython3
+add_5_qubit_correction(code_test, code_test.qubits[0:5], code_test.clbits, decode_dict)
 
 code_test.draw("mpl")
 ```
 
+Let's now test the correction of a single Pauli error:
+
 ```{code-cell} ipython3
+# enter 0 for |0> and 1 for |1>
+encode_value = 1
+
+# enter string for the error and its position
+error_gate = "x"
+error_position = 2
+
+
 quantum_register = QuantumRegister(size=5, name="x")
 checks_register = AncillaRegister(size=4, name="c")
 syndromes = ClassicalRegister(size=4, name="s")
@@ -343,30 +448,39 @@ qubit_measurements = ClassicalRegister(size=5, name="meas")
 
 test_circuit = QuantumCircuit(quantum_register, checks_register, syndromes)
 
-# encode |1> -- comment out to encode |0>
-# test_circuit.x(quantum_register[0])
-# test_circuit.barrier()
+# encode correct value
+if encode_value == 1:
+    test_circuit.x(quantum_register[0])
+    test_circuit.barrier()
 
+# encode
 test_circuit.compose(encoder_circ, inplace=True)
 test_circuit.barrier()
 
-# error to be added
-test_circuit.y(quantum_register[1])
+# add error
+if error_gate == "x":
+    test_circuit.x(quantum_register[error_position])
+elif error_gate == "y":
+    test_circuit.y(quantum_register[error_position])
+elif error_gate == "z":
+    test_circuit.z(quantum_register[error_position])
 test_circuit.barrier()
 
+# add code
 test_circuit.compose(code_test, inplace=True)
 test_circuit.barrier()
 
+# decode
 test_circuit.compose(encoder_circ.inverse(), inplace=True)
 
+# measure
 test_circuit.add_register(qubit_measurements)
-
 test_circuit.measure(quantum_register, qubit_measurements)
 
 test_circuit.draw("mpl")
 ```
 
-Simulation:
+Now, let's run a simulation:
 
 ```{code-cell} ipython3
 simulator = AerSimulator()
@@ -374,31 +488,35 @@ simulator = AerSimulator()
 # Transpile the circuit for the backend
 compiled_circuit = transpile(test_circuit, simulator)
 
-# Run the circuit
+# Run the circuit -- shot probably could be 1...
 job = simulator.run(compiled_circuit, shots=10)
 
 # Get the measurement counts
 counts = job.result().get_counts()
-```
-
-```{code-cell} ipython3
 counts
 ```
 
+We should get back the encoded qubit:
+
 ```{code-cell} ipython3
-counts.keys()
+list(counts.keys())[0].split()[0][::-1] == str(encode_value) + 4 * "0"
 ```
 
 ## Two Qubit Encoding/Decoding and Test
 
++++
+
+We now we will encode two qubits and test for errors.  We will make the test into a function, but let's do a manual test first:
+
 ```{code-cell} ipython3
-p = 0.0
-qubits_str = "11"
+p = 0.05  # probability of error for each encoded qubit
+qubits_str = "11"  # encoded pair of qubits
 
 #######################
 n_qubits = 5
 n_ancillas = 4
 
+# create the circuit
 quantum_register = QuantumRegister(size=2 * n_qubits, name="x")
 checks_register = AncillaRegister(size=2 * n_ancillas, name="c")
 syndromes = ClassicalRegister(size=2 * n_ancillas, name="s")
@@ -444,15 +562,14 @@ for i in range(2 * n_qubits):
             error_occurred[i] = "z"
         else:
             error_occurred[i] += "z"
-
+    # reverse order to see it as composition (right to left)
+    error_occurred[i] = error_occurred[i][::-1]
 test_circuit.barrier()
 
+# add code_circuit (created above)
 for i in range(2):
     test_circuit.compose(
         code_circuit,
-        # qubits=[[quantum_register[i * n_qubits : (i + 1) * n_qubits]]
-        #     + [checks_register[i * n_ancillas : (i + 1) * n_ancillas]]
-        # ],
         qubits=
             list(range(i * n_qubits, (i + 1) * n_qubits))
             + list(
@@ -462,15 +579,14 @@ for i in range(2):
                 )
             ),
         clbits=syndromes[i * n_ancillas : (i + 1) * n_ancillas],
-        # quantum_register[i * n_qubits : (i + 1) * n_qubits]
-        # + checks_register[i * n_ancillas : (i + 1) * n_ancillas]
-        # + syndromes[i * n_ancillas : (i + 1) * n_ancillas],
         inplace=True,
     )
     test_circuit.barrier()
 
 test_circuit.draw("mpl")
 ```
+
+Let's see what was the error.  (If we only have a single error for each of the five encoded qubits, the correction should work.)
 
 ```{code-cell} ipython3
 error_occurred
@@ -482,6 +598,7 @@ for i in range(2):
         test_circuit, 
         quantum_register[i * n_qubits: (i + 1) * n_qubits],
         syndromes[i * n_ancillas: (i + 1) * n_ancillas],
+        decode_dict
     )
     test_circuit.barrier()
 
@@ -489,7 +606,7 @@ for i in range(2):
     test_circuit.compose(encoder_circ.inverse(), quantum_register[i * n_qubits: (i + 1) * n_qubits], inplace=True)
     test_circuit.barrier()
 
-#test_circuit.draw("mpl")
+test_circuit.draw("mpl")
 ```
 
 ```{code-cell} ipython3
@@ -498,8 +615,10 @@ qubit_measurements = ClassicalRegister(size=2 * n_qubits, name="meas")
 test_circuit.add_register(qubit_measurements)
 test_circuit.measure(quantum_register, qubit_measurements)
 
-# test_circuit.draw("mpl")
+test_circuit.draw("mpl")
 ```
+
+Now, we simulate:
 
 ```{code-cell} ipython3
 simulator = AerSimulator()
@@ -515,17 +634,22 @@ counts = job.result().get_counts()
 counts
 ```
 
-```{code-cell} ipython3
-results = {qubits.split()[0] for qubits in counts}
-results
-```
+Now we compare with our input:
 
 ```{code-cell} ipython3
-results.pop()
+result = {qubits.split()[0] for qubits in counts}.pop()[::-1]
+
+# get the logical form of each qubit
+result_split = [result[:n_qubits], result[n_qubits : 2 * n_qubits]]
+
+# check
+result_split[0] == qubits_str[0] + "0" * 4, result_split[1] == qubits_str[1] + "0" * 4
 ```
 
+Now, let's turn it into a function:
+
 ```{code-cell} ipython3
-def test_5_qubit_code(qubits_str, p, shots=20):
+def test_5_qubit_code(qubits_str, p, decode_dict, shots=10):
     n_qubits = 5
     n_ancillas = 4
 
@@ -576,15 +700,14 @@ def test_5_qubit_code(qubits_str, p, shots=20):
                 error_occurred[i] = "z"
             else:
                 error_occurred[i] += "z"
+        # reverse order to see it as composition (right to left)
+        error_occurred[i] = error_occurred[i][::-1]
 
     # encoding + correction
     # NEEDS code_circuit TO BE CONSTRUCTED FIRST!
     for i in range(2):
         test_circuit.compose(
             code_circuit,
-            # qubits=[[quantum_register[i * n_qubits : (i + 1) * n_qubits]]
-            #     + [checks_register[i * n_ancillas : (i + 1) * n_ancillas]]
-            # ],
             qubits=list(range(i * n_qubits, (i + 1) * n_qubits))
             + list(
                 range(
@@ -592,9 +715,6 @@ def test_5_qubit_code(qubits_str, p, shots=20):
                 )
             ),
             clbits=syndromes[i * n_ancillas : (i + 1) * n_ancillas],
-            # quantum_register[i * n_qubits : (i + 1) * n_qubits]
-            # + checks_register[i * n_ancillas : (i + 1) * n_ancillas]
-            # + syndromes[i * n_ancillas : (i + 1) * n_ancillas],
             inplace=True,
         )
 
@@ -604,6 +724,7 @@ def test_5_qubit_code(qubits_str, p, shots=20):
             test_circuit,
             quantum_register[i * n_qubits : (i + 1) * n_qubits],
             syndromes[i * n_ancillas : (i + 1) * n_ancillas],
+            decode_dict
         )
 
     # decoding
@@ -617,7 +738,6 @@ def test_5_qubit_code(qubits_str, p, shots=20):
 
     # add measurements
     qubit_measurements = ClassicalRegister(size=2 * n_qubits, name="meas")
-
     test_circuit.add_register(qubit_measurements)
     test_circuit.measure(quantum_register, qubit_measurements)
 
@@ -653,13 +773,17 @@ def test_5_qubit_code(qubits_str, p, shots=20):
     return True, error_occurred
 ```
 
+Let's run a single test:
+
 ```{code-cell} ipython3
-test_5_qubit_code("11", 0.05)
+test_5_qubit_code("11", 0.15, decode_dict)
 ```
+
+Let's now collect data for different values of $p$.  (**Note:** It can take a long time to run it!)
 
 ```{code-cell} ipython3
 %%time
-max_prob = 0.2
+max_prob = 0.17
 step = 0.01
 
 xs = np.arange(0, max_prob + step, step)
@@ -671,24 +795,64 @@ for i, p in enumerate(xs):
     count = 0
     for _ in range(number_of_tries):
         qubits_str = "".join(np.random.choice(["0", "1"], 2))
-        res, _ = test_5_qubit_code(qubits_str, p)
+        res, _ = test_5_qubit_code(qubits_str, p, decode_dict)
         if res:
             count += 1
         ys[i] = count / number_of_tries
 ```
 
-```{code-cell} ipython3
-ys
-```
+Here are is the table with the percentage of correctly decoded pairs of qubits:
 
 ```{code-cell} ipython3
-plt.plot(xs, ys);
+print(f"{'p':^6} | percentage")
+print("------ | ---------- ")
+for x, y in zip(xs, ys):
+    print(f"{x:^6.2f} | {y:^10.2f}")
 ```
+
+Here is the corresponding plot:
 
 ```{code-cell} ipython3
-plt.savefig("5-qb.png")
+plt.plot(xs, ys, "--o");
+plt.title("Percentage of Pauli Errors Corrected")
+plt.xlabel("$p$ (Probability of Pauli Error)")
+plt.ylabel("Percentage Corrected")
+
+# plt.savefig("5-qb.png")
+
+plt.show()
 ```
+
+Below is the hard coded data from one run:
 
 ```{code-cell} ipython3
-
+ys_found = np.array([1.  , 0.98, 0.94, 0.91, 0.93, 0.77, 0.66, 0.71, 0.65, 0.53, 0.6 ,
+       0.53, 0.44, 0.43, 0.42, 0.33, 0.47, 0.42])
 ```
+
+Here is the table for that run:
+
+|   $p$   | percentage |
+|---------|:----------:|
+| $0.00$  |   $1.00$   |
+| $0.01$  |   $0.98$   |
+| $0.02$  |   $0.94$   |
+| $0.03$  |   $0.91$   |
+| $0.04$  |   $0.93$   |
+| $0.05$  |   $0.77$   |
+| $0.06$  |   $0.66$   |
+| $0.07$  |   $0.71$   |
+| $0.08$  |   $0.65$   |
+| $0.09$  |   $0.53$   |
+| $0.10$  |   $0.60$   |
+| $0.11$  |   $0.53$   |
+| $0.12$  |   $0.44$   |
+| $0.13$  |   $0.43$   |
+| $0.14$  |   $0.42$   |
+| $0.15$  |   $0.33$   |
+| $0.16$  |   $0.47$   |
+| $0.17$  |   $0.42$   |
+
+Here is the corresponding graph:
+
+<img src="5-qb.png" alt="Percentage Corrected for One Run"/>
