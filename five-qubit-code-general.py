@@ -47,7 +47,7 @@ plt.style.use("ggplot")
 # ## Five-Qubit Error-Correcting Code
 
 # %% [markdown]
-# We implement here the [Quantum Five-Qubit Error Correcting Code](https://en.wikipedia.org/wiki/Five-qubit_error_correcting_code), which is a $[[5, 1, 3]]$ code.  We then run experiments with encoded two qubits having the probability of getting a *Pauli error* (i.e., and $X$, $Y$, or $Z$ error) in each of the encoded qubits with a given probability $p$, for a few values of $p$.  So, each error, $X$, $Y$, and $Z$, has a probability of $p$ of occurring in each encoded qubits.  (Therefore, the probability of an encoded qubit having no error is $1 - 3p$.)  We present a visualization of the results.
+# We implement here the [Quantum Five-Qubit Error Correcting Code](https://en.wikipedia.org/wiki/Five-qubit_error_correcting_code), which is a $[[5, 1, 3]]$ code.  We then run experiments with two logical qubits having the probability of getting a *Pauli error* (i.e., and $X$, $Y$, or $Z$ error) in each of the physical qubits with a given probability $p$, for a few values of $p$.  So, the probability of an error occurring in each physical qubit is $3p$, and each error, $X$, $Y$, and $Z$ has equal probability of occurring.  We also present a visualization of the results.
 
 # %% [markdown]
 # ### Stabilizer Group
@@ -82,6 +82,22 @@ g5_gates_str = [
 
 # %%
 def stabilizer_gen(gates_str):
+    """
+    Given a list containing lists of the tensor factors of the generating set of
+    the stabilizer group, returns a list containing circuits for each generator.
+
+    INPUT: A list containing of the tensor factors of the generating set of the
+           stabilizer group.  Each gate must be a string of "x", "z", or "i" (for
+           the identity.)  For example:
+           [
+              ["x", "z", "z", "x", "i"],
+              ["i", "x", "z", "z", "x"],
+              ["x", "i", "x", "z", "z"],
+              ["z", "x", "i", "x", "z"],
+           ]
+
+    OUTPUT: A list containing circuits for each generator.
+    """
     g = []
     for gates in gates_str:
         quantum_register = QuantumRegister(size=len(gates), name="x")
@@ -96,7 +112,7 @@ def stabilizer_gen(gates_str):
 
 
 # %% [markdown]
-# Let's save the generators in `g5`:
+# Let's save the generators in `g5`.  We can use it to test our encoding circuit.
 
 # %%
 g5 = stabilizer_gen(g5_gates_str)
@@ -133,6 +149,9 @@ g5[i].draw("mpl")
 
 # %%
 def five_qubit_encoder():
+    """
+    Returns the encoding circuit for the Five-Qubit Error Correction Code.
+    """
     quantum_register = QuantumRegister(size=5, name="x")
     encoder_circ = QuantumCircuit(quantum_register)
 
@@ -148,13 +167,19 @@ def five_qubit_encoder():
     return encoder_circ
 
 
+# %% [markdown]
+# Let's visualize it:
+
 # %%
 encoder5 = five_qubit_encoder()
 
 encoder5.draw("mpl")
 
 # %% [markdown]
-# Let's check that the coefficients are indeed correct.  We start with $\left| 0 \right\rangle_L$.
+# #### Testing the Encoding Circuit
+
+# %% [markdown]
+# Let's check that this encoding circuit works.  We start with $\left| 0 \right\rangle_L$.
 
 # %%
 logical5_0 = Statevector(encoder5)
@@ -251,26 +276,38 @@ for i, coef in enumerate(4 * logical5_1.data):
 # %% [markdown]
 # Again, it matches!
 #
-# Finally, let's check that $\left| 0 \right\rangle_L$ and $\left| 1 \right\rangle_L$ are indeed $+1$-eigenvalues of the stabilizer group generators, i.e., the $g_i$'s.  
+# Finally, let's check that $\left| 0 \right\rangle_L$ and $\left| 1 \right\rangle_L$ are indeed $+1$-eigenvalues of the stabilizer group generators, i.e., the $g_i$'s.
 #
-# Let's write a function that can check it more generally.
+# Let's write a more general function for that:
 
 # %%
-def test_logical_qubit(qubit, encoder, stabilizer_group):
+def test_logical_qubit(encoder, stabilizer_group):
+    """
+    Test if a given encoder yields +1-eigenstates of the stabilizer group.
+
+    INPUTS:
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * stabilizer_group: a list of circuits for the generators of the stabilizer
+      group.
+
+    OUTPUT: True, if the encoder gives +1-eigenstates, and False otherwise.
+    """
     n_qubits = encoder.num_qubits
-    quantum_register = QuantumRegister(size=n_qubits, name="x")
-    circ = QuantumCircuit(quantum_register)
 
-    if qubit == 1:
-        circ.x(0)
+    for qubit in [0, 1]:
+        quantum_register = QuantumRegister(size=n_qubits, name="x")
+        circ = QuantumCircuit(quantum_register)
 
-    circ.compose(encoder, inplace=True)
+        if qubit == 1:
+            circ.x(0)
 
-    logical = Statevector(circ)
-    for i, gi in enumerate(stabilizer_group):
-        output = Statevector(circ.compose(gi))
-        if not np.array_equal(output.data, logical.data):
-            return False
+        circ.compose(encoder, inplace=True)
+
+        logical = Statevector(circ)
+        for i, gi in enumerate(stabilizer_group):
+            output = Statevector(circ.compose(gi))
+            if not np.array_equal(output.data, logical.data):
+                return False
 
     return True
 
@@ -279,7 +316,7 @@ def test_logical_qubit(qubit, encoder, stabilizer_group):
 # We can now check:
 
 # %%
-test_logical_qubit(0, encoder5, g5) and test_logical_qubit(1, encoder5, g5)
+test_logical_qubit(encoder5, g5)
 
 
 # %% [markdown]
@@ -300,15 +337,15 @@ test_logical_qubit(0, encoder5, g5) and test_logical_qubit(1, encoder5, g5)
 # &\mapsto \frac{1}{\sqrt{2}} \left(\left| \psi \right\rangle \left| 0 \right\rangle +  \left| \psi \right\rangle \left| 1 \right\rangle \right) \\
 # &\mapsto \frac{1}{\sqrt{2}} \left(\left| \psi \right\rangle \left| 0 \right\rangle  \pm  \left| \psi \right\rangle \left| 1 \right\rangle \right) \\
 # &= \left| \psi \right\rangle \otimes \frac{1}{\sqrt{2}} \left( \left| 0 \right\rangle \pm \left| 1 \right\rangle \right) \\
-# &= \left| \psi \right\rangle \left| (1 - (\pm 1)) /2 \right\rangle.
+# &\mapsto \left| \psi \right\rangle \left| (1 - (\pm 1)) /2 \right\rangle.
 # \end{align*}
 # $$
 #
-# We can apply this to $M=X$ and $M=Z$ to detect errors.  Suppose that $g_i$ has a tensor factor of $X$ in the $j$-th qubit. Then, we have that $X_j g_i = g_i X_j$, and if $\left| \psi \right\rangle$ is a $+1$-eigenstate of $g_i$, then
+# We can apply this to $M=X$ and $M=Z$ to detect errors: suppose that $g_i$ has a tensor factor of $X$ in the $j$-th qubit. Then, we have that $X_j g_i = g_i X_j$, and if $\left| \psi \right\rangle$ is a $+1$-eigenstate of $g_i$, then
 # $$
 # g_i \left(X_j \left| \psi \right\rangle \right) = X_j \left(g_i \left| \psi \right\rangle \right) = X_j \left| \psi \right\rangle,
 # $$
-# i.e., $X_j \left| \psi \right\rangle$ is also a $+1$-eigenstate, and our circuit above yields a measurement of $0$.
+# i.e., $X_j \left| \psi \right\rangle$ is also a $+1$-eigenstate of $g_i$, and our circuit above yields a measurement of $0$.
 #
 #
 # On the other hand, since $XZ=-ZX$ and $XY = -YX$, we have that $U_j g_i = -g_i U_j$ for $U$ either $Z$ or $Y$, and then
@@ -323,6 +360,27 @@ test_logical_qubit(0, encoder5, g5) and test_logical_qubit(1, encoder5, g5)
 
 # %%
 def stabilizer_error_correction_circ(encoder, gates_str, barrier=False):
+    """
+    Produces a circuit with the encoding and error measurements  for a stabilizer
+    code.
+
+    INPUTS:
+    * encoder: the encoder for the code;
+    * gates_str: a list containing of the tensor factors of the generating set of
+                the stabilizer group.  Each gate must be a string of "x", "z", or
+                "i" (for the identity.)  For example:
+                   [
+                      ["x", "z", "z", "x", "i"],
+                      ["i", "x", "z", "z", "x"],
+                      ["x", "i", "x", "z", "z"],
+                      ["z", "x", "i", "x", "z"],
+                   ]
+    * barrier: a boolan determining if barriers should be added between encoding
+               and steps of encoding.  (Default: False)
+
+    OUTPUT: A circuit that encodes, checks for errors, and measure the checks in
+            classical bits (syndromes).
+    """
     register_size = len(gates_str[0])
     checks_size = len(gates_str)
 
@@ -369,10 +427,29 @@ code5_circuit.draw("mpl")
 
 
 # %% [markdown]
-# We can also produce a table that can gives the measurements for each Pauli error:
+# We can also produce a table that gives the measurements for each Pauli error:
 
 # %%
 def error_table(gates_str):
+    """
+    Produces the error table given the generators of a stabilizer error.
+
+    INPUT: A list containing of the tensor factors of the generating set of the
+           stabilizer group.  Each gate must be a string of "x", "z", or "i" (for
+           the identity.)  For example:
+           [
+              ["x", "z", "z", "x", "i"],
+              ["i", "x", "z", "z", "x"],
+              ["x", "i", "x", "z", "z"],
+              ["z", "x", "i", "x", "z"],
+           ]
+
+    OUTPUT: A dictionary with keys as tuples made of a string and and integer and
+            values lists of 0's and 1's.  For example a key ("x", 2) corresponds
+            to X_2 (X in the tensor factor 2 and identity in all other factors), 
+            and the list in the value corresponds to the measurements in the ancilla
+            for that error.
+    """
     n_qubits = len(gates_str[0])
     n_syndromes = len(gates_str)
 
@@ -421,7 +498,7 @@ def add_5_qubit_correction(circuit, qubits, syndromes, decode_dict):
     """
     Adds correction for five-qubit code circuit (in-place) using a decoding table.
 
-    INPUT:
+    INPUTS:
     * circuit: the circuit containing the five-qubit code;
     * qubtis: register for the qubits and checks;
     * syndromes: syndromes containing the measurements;
@@ -441,16 +518,18 @@ def add_5_qubit_correction(circuit, qubits, syndromes, decode_dict):
 
 
 # %% [markdown]
-# Let's then add corrections our circuit:
+# Let's then add corrections to our circuit:
 
 # %%
-add_5_qubit_correction(code5_circuit, code5_circuit.qubits[0:5], code5_circuit.clbits, decode5_dict)
+add_5_qubit_correction(
+    code5_circuit, code5_circuit.qubits[0:5], code5_circuit.clbits, decode5_dict
+)
 
 code5_circuit.draw("mpl")
 
 
 # %% [markdown]
-# Let's now test the correction of a single Pauli error.  The following function creates a code circuit, adds a specific error to a specific qubit after the encoding.
+# Let's now test the correction of a single Pauli error.  The following function creates a code circuit and adds a specific error to a specific qubit after the encoding.
 
 # %%
 def test_error_circuit(
@@ -462,6 +541,30 @@ def test_error_circuit(
     error_position,
     barrier=False,
 ):
+    """
+    Creates a code circuit with an error introduced to test the error-correction.
+
+    INPUTS:
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * gates_str: a list containing of the tensor factors of the generating set of
+                the stabilizer group.  Each gate must be a string of "x", "z", or
+                "i" (for the identity.)  For example:
+                   [
+                      ["x", "z", "z", "x", "i"],
+                      ["i", "x", "z", "z", "x"],
+                      ["x", "i", "x", "z", "z"],
+                      ["z", "x", "i", "x", "z"],
+                   ];
+    * add_corrections: a function that adds the correction step for the code;
+    * qubit: a boolean, or interger 0 or 1, for the qubit to be encoded;
+    * error_gate: a string for the error gate, i.e., "x", "y", or "z";
+    * error_position: the index for the qubit at which the error is introduced;
+    * barrier: a boolan determining if barriers should be added between encoding
+               and steps of encoding.  (Default: False.)
+
+    OUTPUT: A circuit that sets the qubit to be encoded, followed by the encoder
+            and the code circuit with corrections.
+    """
     n_qubits = len(gates_str[0])
     n_checks = len(gates_str)
 
@@ -519,11 +622,11 @@ def test_error_circuit(
 
 
 # %% [markdown]
-# So, let's create the circuit to test the error-correcting:
+# Let's print an example of the circuit:
 
 # %%
 # change these to test:
-encoded_qubit = 1
+encoded_qubit = False
 error_gate = "x"
 error_position = 2
 
@@ -531,42 +634,59 @@ test_error_circuit(
     encoder5, g5_gates_str, add_5_qubit_correction, encoded_qubit, error_gate, error_position, barrier=True
 ).draw("mpl")
 
-# %%
-# change these to test:
-encoded_qubit = 1
-error_gate = "x"
-error_position = 2
-
-test5_circ = test_error_circuit(
-    encoder5, g5_gates_str, add_5_qubit_correction, encoded_qubit, error_gate, error_position, barrier=True
-)
-
 
 # %% [markdown]
-# Now, a function for individual tests:
+# Now, we write a function to test the error correction for a particular error:
 
 # %%
 def test_error_one_sim(
     encoder, gates_str, add_correction, qubit, error_gate, error_position
 ):
+    """
+    Tests if a code circuit with an error introduced can correct the error.
+
+    INPUTS:
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * gates_str: a list containing of the tensor factors of the generating set of
+                the stabilizer group.  Each gate must be a string of "x", "z", or
+                "i" (for the identity.)  For example:
+                   [
+                      ["x", "z", "z", "x", "i"],
+                      ["i", "x", "z", "z", "x"],
+                      ["x", "i", "x", "z", "z"],
+                      ["z", "x", "i", "x", "z"],
+                   ];
+    * add_corrections: a function that adds the correction step for the code;
+    * qubit: a boolean, or interger 0 or 1, for the qubit to be encoded;
+    * error_gate: a string for the error gate, i.e., "x", "y", or "z";
+    * error_position: the index for the qubit at which the error is introduced.
+
+    OUTPUT: True, if the circuit could correct the error and False otherwise.
+    """
     n_qubits = len(gates_str[0])
-    
+
     circ = test_error_circuit(
-        encoder, gates_str, add_correction, qubit, error_gate, error_position, barrier=False
+        encoder,
+        gates_str,
+        add_correction,
+        qubit,
+        error_gate,
+        error_position,
+        barrier=False,
     )
 
     simulator = AerSimulator()
 
     # Transpile the circuit for the backend
     compiled_circuit = transpile(circ, simulator)
-    
+
     # Run the circuit -- shot probably could be 1...
     job = simulator.run(compiled_circuit, shots=10)
-    
+
     # Get the measurement counts
     counts = job.result().get_counts()
 
-    return list(counts.keys())[0].split()[0][::-1] == str(qubit) + (n_qubits - 1) * "0"
+    return list(counts.keys())[0].split()[0][::-1] == str(int(qubit)) + (n_qubits - 1) * "0"
 
 
 # %% [markdown]
@@ -574,7 +694,7 @@ def test_error_one_sim(
 
 # %%
 # change these to test:
-encoded_qubit = 1
+encoded_qubit = True
 error_gate = "x"
 error_position = 2
 
@@ -589,13 +709,32 @@ test_error_one_sim(
 
 
 # %% [markdown]
-# We can now do a full test for all possible one qubit errors:
+# We can now do a full test for all possible one-qubit errors:
 
 # %%
 def test_error_full(encoder, gates_str, add_correction):
+    """
+    Tests if a code circuit with an error introduced can correct the error.
+
+    INPUTS:
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * gates_str: a list containing of the tensor factors of the generating set of
+                the stabilizer group.  Each gate must be a string of "x", "z", or
+                "i" (for the identity.)  For example:
+                   [
+                      ["x", "z", "z", "x", "i"],
+                      ["i", "x", "z", "z", "x"],
+                      ["x", "i", "x", "z", "z"],
+                      ["z", "x", "i", "x", "z"],
+                   ];
+    * add_corrections: a function that adds the correction step for the code.
+
+    OUTPUT: True, if the circuit could correct all possible single Pauli error in
+            any qubit and with any encoded qubit, and False otherwise.
+    """
     n_qubits = len(gates_str[0])
 
-    for qubit in [0, 1]:
+    for qubit in [True, False]:
         for error_gate in ["x", "y", "z"]:
             for error_position in range(n_qubits):
                 if not test_error_one_sim(
@@ -623,10 +762,37 @@ test_error_full(encoder5, g5_gates_str, add_5_qubit_correction)
 # ### Two Qubit Encoding/Decoding and Test
 
 # %% [markdown]
-# We now need to produce a circuit that encodes two qubits using the five-qubit code, but introduces error according to a given probability.  But let's create a more general function, that can do it for other stabilizer codes and any number of qubits:
+# We now need to produce a circuit that encodes two qubits using the five-qubit code, but introduces error according to a given probability.  But let's create a more general function, that can do it for other stabilizer codes and any number of qubits to be encoded:
 
 # %%
-def n_qubit_plus_errors_circ(n, gates_str, encoder, add_correction, qubits, p, barrier=False):
+def n_qubit_plus_errors_circ(
+    n, gates_str, encoder, add_correction, qubits, p, barrier=False
+):
+    """
+    Produces a circuit that prepares the state for n qubits to be encoded followed
+    by the encoders (for each qubit), random individual errors in each qubit of X,
+    Y, or Z with probability p for each one and each qubit, followed by the
+    correction, decoding for all qubits, and measuments.
+
+    INPUTS:
+    * n: the number of qubits to be encoded;
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * add_corrections: a function that adds the correction step for the code;
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * barrier: a boolan determining if barriers should be added between encoding
+               and steps of encoding.  (Default: False.)
+
+    OUTPUTS:
+    * a circuit that prepares the state for the qubits to be encoded, followed by the
+      encoders (for each qubit), random individual errors in each qubit of X, Y, or Z
+      with probability p for each one and each qubit, followed by the correction,
+      decoding for all qubits, and measuments;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
     n_qubits = len(gates_str[0])
     n_ancillas = len(gates_str)
 
@@ -664,29 +830,39 @@ def n_qubit_plus_errors_circ(n, gates_str, encoder, add_correction, qubits, p, b
 
     # random errors
     error_occurred = ["i"] * (n * n_qubits)
+    # for i in range(n * n_qubits):
+    #     rnd = np.random.random(3)
+    #     # X error
+    #     if rnd[0] < p:
+    #         circ.x(quantum_register[i])
+    #         error_occurred[i] = "x"
+    #     # Y error
+    #     if rnd[1] < p:
+    #         circ.y(quantum_register[i])
+    #         if error_occurred[i] == "i":
+    #             error_occurred[i] = "y"
+    #         else:
+    #             error_occurred[i] += "y"
+    #     # Z error
+    #     if rnd[2] < p:
+    #         circ.z(quantum_register[i])
+    #         if error_occurred[i] == "i":
+    #             error_occurred[i] = "z"
+    #         else:
+    #             error_occurred[i] += "z"
+    #     # reverse order to see it as composition (right to left)
+    #     error_occurred[i] = error_occurred[i][::-1]
     for i in range(n * n_qubits):
-        rnd = np.random.random(3)
-        # X error
-        if rnd[0] < p:
-            circ.x(quantum_register[i])
-            error_occurred[i] = "x"
-        # Y error
-        if rnd[1] < p:
-            circ.y(quantum_register[i])
-            if error_occurred[i] == "i":
-                error_occurred[i] = "y"
+        rnd = np.random.random()
+        if rnd < 3 * p:
+            error = np.random.choice(["x", "y", "z"])
+            error_occurred[i] = error
+            if error == "x":
+                circ.x(quantum_register[i])
+            elif error == "y":
+                circ.y(quantum_register[i])
             else:
-                error_occurred[i] += "y"
-        # Z error
-        if rnd[2] < p:
-            circ.z(quantum_register[i])
-            if error_occurred[i] == "i":
-                error_occurred[i] = "z"
-            else:
-                error_occurred[i] += "z"
-        # reverse order to see it as composition (right to left)
-        error_occurred[i] = error_occurred[i][::-1]
-
+                circ.z(quantum_register[i])
     if barrier:
         circ.barrier()
 
@@ -740,6 +916,28 @@ def n_qubit_plus_errors_circ(n, gates_str, encoder, add_correction, qubits, p, b
 
 # %%
 def two_qubit_plus_errors_5_circ(qubits, p, barrier=False):
+    """
+    Produces a circuit that prepares the state for 2 qubits to be encoded using
+    the 5-qubit code, followed by the encoders (for each qubit), random individual
+    errors in each qubit of X, Y, or Z with probability p for each one and each
+    qubit, followed by the correction, decoding for all qubits, and measuments.
+
+    INPUTS:
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * barrier: a boolan determining if barriers should be added between encoding
+               and steps of encoding.  (Default: False.)
+
+    OUTPUTS:
+    * a circuit that prepares the state for the qubits to be encoded, followed by the
+      encoders (for each qubit), random individual errors in each qubit of X, Y, or Z
+      with probability p for each one and each qubit, followed by the correction,
+      decoding for all qubits, and measuments;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
 
     g5_gates_str = [
         ["x", "z", "z", "x", "i"],
@@ -782,6 +980,37 @@ error
 def n_qubit_plus_errors_sim(
     n, gates_str, encoder, add_correction, qubits, p, shots=10
 ):
+    """
+    Produces a circuit that prepares the state for n qubits to be encoded followed
+    by the encoders (for each qubit), random individual errors in each qubit of X,
+    Y, or Z with probability p for each one and each qubit, followed by the
+    correction, decoding for all qubits, and measuments, then runs a simulation and
+    verifies if the error was corrected.
+
+    INPUTS:
+    * n: the number of qubits to be encoded;
+    * gates_str: a list containing of the tensor factors of the generating set of
+                the stabilizer group.  Each gate must be a string of "x", "z", or
+                "i" (for the identity.)  For example:
+                   [
+                      ["x", "z", "z", "x", "i"],
+                      ["i", "x", "z", "z", "x"],
+                      ["x", "i", "x", "z", "z"],
+                      ["z", "x", "i", "x", "z"],
+                   ];
+    * encoder: a circuit with the encorder for the stabilizer code;
+    * add_corrections: a function that adds the correction step for the code;
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * shots: number of shots to be used in the simulation. (Default: 10.)
+
+    OUTPUTS:
+    * a boolean, with True if the circuit corrected the error;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
 
     circ, error_occurred = n_qubit_plus_errors_circ(
         n, gates_str, encoder, add_correction, qubits, p, barrier=False
@@ -826,6 +1055,25 @@ def n_qubit_plus_errors_sim(
 
 # %%
 def two_qubit_plus_errors_5_sim(qubits, p, shots=10):
+    """
+    Produces a circuit that prepares the state for 2 qubits to be encoded using
+    the 5-qubit code, followed by the encoders (for each qubit), random individual
+    errors in each qubit of X, Y, or Z with probability p for each one and each
+    qubit, followed by the correction, decoding for all qubits, and measuments,
+    then runs a simulation and verifies if the error was corrected.
+
+    INPUTS:
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * shots: number of shots to be used in the simulation. (Default: 10.)
+
+    OUTPUTS:
+    * a boolean, with True if the circuit corrected the error;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
     g5_gates_str = [
         ["x", "z", "z", "x", "i"],
         ["i", "x", "z", "z", "x"],
@@ -887,14 +1135,45 @@ print("------ | ---------- ")
 for x, y in zip(xs, ys):
     print(f"{x:^6.2f} | {y:^10.2f}")
 
+
+# %% [markdown]
+# The probability that any error occur in a qubit is $3p$.  So if we have $n$ qubits and the probability that we have at most one error, in which case our code will certainly produce the correct result, is:
+# $$
+# (1 - 3p)^n + n \cdot (1 - 3p)^{n-1} \cdot 3p = (1 - 3p)^{n-1} \left(1 - 3p + n \cdot 3p \right) = (1 - 3p)^{n-1} \left(1 + 3(n-1)p\right).
+# $$
+# In practice, although with low probability, the code could fix more errors "by accident", so that should approximate the lower bound for the percentage of errors corrected.
+#
+# Let's add it as a function:
+
+# %%
+def lower_probability(n_qubits, p):
+    """
+    Give the probability we get at most one error of probability 3 * p in all
+    n_qubits qubits.
+
+    INPUTS:
+    * n_qubits: number of qubits;
+    * p: 1/3 of the probability that a Pauli error occurs.
+
+    OUTPUT:
+    the probability we get at most one error occurs.
+    """
+    return (1 - 3 * p) ** (n_qubits - 1) * (1 + 3 * (n_qubits - 1) * p)
+
+
 # %% [markdown]
 # Here is the corresponding plot:
 
 # %%
-plt.plot(xs, ys, "--o");
+ys_est = lower_probability(5, xs)
+
+plt.plot(xs, ys_est, alpha=0.4, label="Estimates")
+plt.plot(xs, ys, "--o", label="Empirical Probability")
+
 plt.title("Empirical Probability of Correcting Errors")
 plt.xlabel("$p$ (Probability of Pauli Error)")
 plt.ylabel("Empirical Probability")
+plt.legend()
 
 # plt.savefig("5-qb.png")
 
@@ -906,32 +1185,32 @@ plt.show()
 # %%
 xs_found_1000_5qb = np.array([0.  , 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1 ,
        0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17])
-ys_found_1000_5qb = np.array([1.   , 0.99 , 0.948, 0.944, 0.867, 0.812, 0.754, 0.68 , 0.666,
-       0.603, 0.526, 0.509, 0.489, 0.439, 0.419, 0.385, 0.38 , 0.333])
+ys_found_1000_5qb = np.array([1.   , 0.99 , 0.951, 0.889, 0.839, 0.809, 0.754, 0.679, 0.613,
+       0.585, 0.527, 0.473, 0.387, 0.395, 0.34 , 0.312, 0.296, 0.3])
 
 # %% [markdown]
 # Here is the table for that run:
 #
-# |   $p$   | percentage |
-# |---------|:----------:|
+# |   $p$   | percentage  |
+# |---------|:-----------:|
 # | $0.00$  |   $1.000$   |
 # | $0.01$  |   $0.990$   |
-# | $0.02$  |   $0.948$   |
-# | $0.03$  |   $0.944$   |
-# | $0.04$  |   $0.867$   |
-# | $0.05$  |   $0.812$   |
+# | $0.02$  |   $0.951$   |
+# | $0.03$  |   $0.889$   |
+# | $0.04$  |   $0.839$   |
+# | $0.05$  |   $0.809$   |
 # | $0.06$  |   $0.754$   |
-# | $0.07$  |   $0.680$   |
-# | $0.08$  |   $0.666$   |
-# | $0.09$  |   $0.603$   |
-# | $0.10$  |   $0.526$   |
-# | $0.11$  |   $0.509$   |
-# | $0.12$  |   $0.489$   |
-# | $0.13$  |   $0.439$   |
-# | $0.14$  |   $0.419$   |
-# | $0.15$  |   $0.385$   |
-# | $0.16$  |   $0.380$   |
-# | $0.17$  |   $0.333$   |
+# | $0.07$  |   $0.679$   |
+# | $0.08$  |   $0.613$   |
+# | $0.09$  |   $0.585$   |
+# | $0.10$  |   $0.527$   |
+# | $0.11$  |   $0.473$   |
+# | $0.12$  |   $0.387$   |
+# | $0.13$  |   $0.395$   |
+# | $0.14$  |   $0.340$   |
+# | $0.15$  |   $0.312$   |
+# | $0.16$  |   $0.296$   |
+# | $0.17$  |   $0.300$   |
 #
 # Here is the corresponding graph:
 #
@@ -941,13 +1220,13 @@ ys_found_1000_5qb = np.array([1.   , 0.99 , 0.948, 0.944, 0.867, 0.812, 0.754, 0
 # ## Steane's Code
 
 # %% [markdown]
-# We can apply similar ideas, and the functions created above, to other stabilizer codes.  Now we turn our attention to [Steane code](https://en.wikipedia.org/wiki/Steane_code), which is a $[[7,4,3]]$ code.
+# We can apply similar ideas, and the functions created above, to other stabilizer codes.  Now we turn our attention to [Steane code](https://en.wikipedia.org/wiki/Steane_code), which is a $[[7,4,3]]$ code.  In this example, we will only verify the correction, for probability $3p$ that an error occurs, for one encoded qubit.
 
 # %% [markdown]
 # ### Stabilizer Group
 
 # %% [markdown]
-# Again, we first encode the generating set for the stabilizer group:
+# Again, we first encode the generating set for the stabilizer group, as found in [Wikipedia](https://en.wikipedia.org/wiki/Steane_code) (or from the matrix in [EC Zoo](https://errorcorrectionzoo.org/)'s [Steane Code](https://errorcorrectionzoo.org/c/steane)):
 
 # %%
 g7_gates_str = [
@@ -970,10 +1249,13 @@ g7 = stabilizer_gen(g7_gates_str)
 # ### Encoding
 
 # %% [markdown]
-# We follow [Steane's Error Correction Code](https://stem.mitre.org/quantum/error-correction-codes/steane-ecc.html).  Here is the encoder circuit given:
+# We follow [MITRE STEM](https://stem.mitre.org/)'s [Steane's Error Correction Code](https://stem.mitre.org/quantum/error-correction-codes/steane-ecc.html).  Here is the encoder circuit given:
 
 # %%
 def steanes_encoder():
+    """
+    Returns the encoding circuit for the Steane's Error Correction Code.
+    """
     quantum_register = QuantumRegister(size=7, name="x")
     encoder = QuantumCircuit(quantum_register)
 
@@ -1081,7 +1363,7 @@ for i, coef in enumerate(np.sqrt(8) * logical7_1.data):
 # Finally, we can use our `test_logical_qubit` function to test them against the stabilizer group:
 
 # %%
-test_logical_qubit(0, encoder7, g7) and test_logical_qubit(1, encoder7, g7)
+test_logical_qubit(encoder7, g7)
 
 # %% [markdown]
 # ### Error Correction
@@ -1155,10 +1437,32 @@ test_error_full(encoder7, g7_gates_str, add_7_qubit_correction)
 # ### Generating Function and Testing
 
 # %% [markdown]
-# We can use `n_qubit_plus_errors_circ` to generate a circuit that produces the Steane's code for one qubit, with Pauli errors appearing in each encoded qubit with probability $p$:
+# We can use `n_qubit_plus_errors_circ` to generate a circuit that produces the Steane's code for one qubit, with Pauli errors appearing in each encoded qubit with probability $3p$:
 
 # %%
 def one_qubit_plus_errors_7_circ(qubit, p, barrier=False):
+    """
+    Produces a circuit that prepares the state for 1 qubits to be encoded using
+    the Steane's code, followed by the encoder, random individual, errors in each
+    qubit of X, Y, or Z with probability p for each one and each qubit, followed
+    by the correction, decoding, and measuments.
+
+    INPUTS:
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * barrier: a boolan determining if barriers should be added between encoding
+               and steps of encoding.  (Default: False.)
+
+    OUTPUTS:
+    * a circuit that prepares the state for a qubit to be encoded, followed by the
+      encoder, random individual errors in each qubit of X, Y, or Z with probability
+      p for each one and each qubit, followed by the correction, decoding, and
+      measuments;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
 
     g7_gates_str = [
         ["i", "i", "i", "x", "x", "x", "x"],
@@ -1202,6 +1506,25 @@ error
 
 # %%
 def one_qubit_plus_errors_7_sim(qubit, p, shots=10):
+    """
+    Produces a circuit that prepares the state for 1 qubits to be encoded using
+    the Steane's code, followed by the encoder, random individual errors in each
+    qubit of X, Y, or Z with probability p for each one and each qubit, followed
+    by the correction, decoding, and measuments, then runs a simulation and
+    verifies if the error was corrected.
+
+    INPUTS:
+    * qubits: a list/tuple of booleans, or intergers 0 or 1, that represent the
+              qubits to be encoded;
+    * p: the probability that an X, Y, or Z error occurs in a physical qubit
+         (so the probability that at least one error occur in a physical qubit
+         is 3 * p, and and each error has the same probability);
+    * shots: number of shots to be used in the simulation. (Default: 10.)
+
+    OUTPUTS:
+    * a boolean, with True if the circuit corrected the error;
+    * a list of strings with errors for each qubit, with "i" representing the identity.
+    """
     g7_gates_str = [
         ["i", "i", "i", "x", "x", "x", "x"],
         ["i", "x", "x", "i", "i", "x", "x"],
@@ -1265,10 +1588,15 @@ for x, y in zip(xs, ys):
 # Here is the corresponding plot:
 
 # %%
-plt.plot(xs, ys, "--o");
+ys_est = lower_probability(7, xs)
+
+plt.plot(xs, ys_est, alpha=0.4, label="Estimates")
+plt.plot(xs, ys, "--o", label="Empirical Probability")
+
 plt.title("Percentage of Pauli Errors Corrected")
 plt.xlabel("$p$ (Probability of Pauli Error)")
 plt.ylabel("Percentage Corrected")
+plt.legend()
 
 # plt.savefig("steane.png")
 
@@ -1280,33 +1608,45 @@ plt.show()
 # %%
 xs_found_1000_steanes = np.array([0.  , 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1 ,
        0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17])
-ys_found_1000_steanes = np.array([1.   , 0.989, 0.939, 0.894, 0.834, 0.759, 0.701, 0.625, 0.561,
-       0.522, 0.472, 0.437, 0.399, 0.376, 0.321, 0.314, 0.247, 0.255])
+ys_found_1000_steanes = np.array([1.   , 0.987, 0.94 , 0.889, 0.838, 0.762, 0.678, 0.611, 0.503,
+       0.472, 0.401, 0.384, 0.327, 0.282, 0.257, 0.251, 0.208, 0.196])
 
 # %% [markdown]
 # Here is the table for that run:
 #
-# |   $p$   | percentage |
-# |---------|:----------:|
+# |   $p$   | percentage  |
+# |---------|:-----------:|
 # | $0.00$  |   $1.000$   |
-# | $0.01$  |   $0.989$   |
-# | $0.02$  |   $0.939$   |
-# | $0.03$  |   $0.894$   |
-# | $0.04$  |   $0.834$   |
-# | $0.05$  |   $0.759$   |
-# | $0.06$  |   $0.701$   |
-# | $0.07$  |   $0.625$   |
-# | $0.08$  |   $0.561$   |
-# | $0.09$  |   $0.522$   |
-# | $0.10$  |   $0.472$   |
-# | $0.11$  |   $0.437$   |
-# | $0.12$  |   $0.399$   |
-# | $0.13$  |   $0.376$   |
-# | $0.14$  |   $0.321$   |
-# | $0.15$  |   $0.314$   |
-# | $0.16$  |   $0.247$   |
-# | $0.17$  |   $0.255$   |
+# | $0.01$  |   $0.990$   |
+# | $0.02$  |   $0.948$   |
+# | $0.03$  |   $0.944$   |
+# | $0.04$  |   $0.867$   |
+# | $0.05$  |   $0.812$   |
+# | $0.06$  |   $0.754$   |
+# | $0.07$  |   $0.680$   |
+# | $0.08$  |   $0.666$   |
+# | $0.09$  |   $0.603$   |
+# | $0.10$  |   $0.526$   |
+# | $0.11$  |   $0.509$   |
+# | $0.12$  |   $0.489$   |
+# | $0.13$  |   $0.439$   |
+# | $0.14$  |   $0.419$   |
+# | $0.15$  |   $0.385$   |
+# | $0.16$  |   $0.380$   |
+# | $0.17$  |   $0.333$   |
 #
 # Here is the corresponding graph:
 #
 # <img src="steane-1000.png" alt="Percentage Corrected for One Run"/>
+
+# %% [markdown]
+# ## References
+
+# %% [markdown]
+# * [Wikipedia](https://en.wikipedia.org/)'s [Quantum Five-Qubit Error Correcting Code](https://en.wikipedia.org/wiki/Five-qubit_error_correcting_code)
+# * Nielsen and Chuang's [Quantum Computation and Quantum Information](https://www.cambridge.org/highereducation/books/quantum-computation-and-quantum-information/01E10196D0A682A6AEFFEA52D53BE9AE#overview)
+# *  [Stack Exchange](https://quantumcomputing.stackexchange.com/)'s thread [Nielsen&Chuang 5-qubit quantum error-correction encoding gate](https://quantumcomputing.stackexchange.com/questions/14264/nielsenchuang-5-qubit-quantum-error-correction-encoding-gate)
+# *  [Bernard Zygelman](https://www.physics.unlv.edu/~bernard/)'s [Five and Seven Qubit Codes](https://www.physics.unlv.edu/~bernard/MATH_book/Chap9/Notebook9_3.pdf)
+# * [Wikipedia](https://en.wikipedia.org/)'s [Steane code](https://en.wikipedia.org/wiki/Steane_code)
+# *  [MITRE STEM](https://stem.mitre.org/)'s [Steane's Error Correction Code](https://stem.mitre.org/quantum/error-correction-codes/steane-ecc.html)
+# * [EC Zoo](https://errorcorrectionzoo.org/)'s [Steane Code](https://errorcorrectionzoo.org/c/steane)
