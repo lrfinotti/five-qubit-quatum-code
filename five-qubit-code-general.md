@@ -387,7 +387,7 @@ def error_table(gates_str):
 ```{code-cell} ipython3
 decode5_dict = error_table(g5_gates_str)
 
-for error, syndrome in decode5_dict.items():          
+for error, syndrome in decode5_dict.items():
     print(f"{error[0]}_{error[1]}: {syndrome}")
 ```
 
@@ -446,10 +446,23 @@ Let's now test the correction of a single Pauli error.  The following function c
 
 ```{code-cell} ipython3
 def test_error_circuit(
-    encoder, code_circuit, qubit, error_gate, error_position, barrier=False
+    encoder,
+    gates_str,
+    add_corrections,
+    qubit,
+    error_gate,
+    error_position,
+    barrier=False,
 ):
-    n_qubits = code_circuit.num_qubits - code_circuit.num_ancillas
-    n_checks = code_circuit.num_ancillas
+    n_qubits = len(gates_str[0])
+    n_checks = len(gates_str)
+
+    decode_dict = error_table(gates_str)
+
+    code_circuit = stabilizer_error_correction_circ(encoder, gates_str, barrier=barrier)
+    add_corrections(
+        code_circuit, code_circuit.qubits[:n_qubits], code_circuit.clbits, decode_dict
+    )
 
     quantum_register = QuantumRegister(size=n_qubits, name="x")
     checks_register = QuantumRegister(size=n_checks, name="c")
@@ -505,34 +518,96 @@ encoded_qubit = 1
 error_gate = "x"
 error_position = 2
 
+test_error_circuit(
+    encoder5, g5_gates_str, add_5_qubit_correction, encoded_qubit, error_gate, error_position, barrier=True
+).draw("mpl")
+```
+
+```{code-cell} ipython3
+# change these to test:
+encoded_qubit = 1
+error_gate = "x"
+error_position = 2
+
 test5_circ = test_error_circuit(
-    encoder5, code5_circuit, encoded_qubit, error_gate, error_position, barrier=False
+    encoder5, g5_gates_str, add_5_qubit_correction, encoded_qubit, error_gate, error_position, barrier=True
 )
-
-test5_circ.draw("mpl")
 ```
 
-Now, let's run a simulation to see if the introduced error was corrected:
+Now, a function for individual tests:
 
 ```{code-cell} ipython3
-simulator = AerSimulator()
+def test_error_one_sim(
+    encoder, gates_str, add_correction, qubit, error_gate, error_position
+):
+    n_qubits = len(gates_str[0])
+    
+    circ = test_error_circuit(
+        encoder, gates_str, add_correction, qubit, error_gate, error_position, barrier=False
+    )
 
-# Transpile the circuit for the backend
-compiled_circuit = transpile(test5_circ, simulator)
+    simulator = AerSimulator()
 
-# Run the circuit -- shot probably could be 1...
-job = simulator.run(compiled_circuit, shots=10)
+    # Transpile the circuit for the backend
+    compiled_circuit = transpile(circ, simulator)
+    
+    # Run the circuit -- shot probably could be 1...
+    job = simulator.run(compiled_circuit, shots=10)
+    
+    # Get the measurement counts
+    counts = job.result().get_counts()
 
-# Get the measurement counts
-counts = job.result().get_counts()
-counts
+    return list(counts.keys())[0].split()[0][::-1] == str(qubit) + (n_qubits - 1) * "0"
 ```
 
-We should get back the encoded qubit:
+One test:
 
 ```{code-cell} ipython3
-list(counts.keys())[0].split()[0][::-1] == str(encoded_qubit) + 4 * "0"
+# change these to test:
+encoded_qubit = 1
+error_gate = "x"
+error_position = 2
+
+test_error_one_sim(
+    encoder5,
+    g5_gates_str,
+    add_5_qubit_correction,
+    encoded_qubit,
+    error_gate,
+    error_position,
+)
 ```
+
+We can now do a full test for all possible one qubit errors:
+
+```{code-cell} ipython3
+def test_error_full(encoder, gates_str, add_correction):
+    n_qubits = len(gates_str[0])
+
+    for qubit in [0, 1]:
+        for error_gate in ["x", "y", "z"]:
+            for error_position in range(n_qubits):
+                if not test_error_one_sim(
+                    encoder,
+                    gates_str,
+                    add_correction,
+                    qubit,
+                    error_gate,
+                    error_position,
+                ):
+                    print(f"Failed for {qubit = }, {error_gate = }, {error_position = }")
+                    return False
+
+    return True
+```
+
+```{code-cell} ipython3
+test_error_full(encoder5, g5_gates_str, add_5_qubit_correction)
+```
+
+So, indeed the code can fully correct a single Pauli error in any encoded qubit.
+
++++
 
 ### Two Qubit Encoding/Decoding and Test
 
@@ -772,7 +847,7 @@ Let's now collect data for different values of $p$.  (**Note:** It can take a lo
 
 ```{code-cell} ipython3
 %%time
-max_prob = 0.05
+max_prob = 0.17
 step = 0.01
 
 xs = np.arange(0, max_prob + step, step)
@@ -789,10 +864,6 @@ for i, p in enumerate(xs):
         if res:
             count += 1
         ys[i] = count / number_of_tries
-```
-
-```{code-cell} ipython3
-ys
 ```
 
 Here are is the table with the percentage of correctly decoded pairs of qubits:
@@ -812,43 +883,46 @@ plt.title("Empirical Probability of Correcting Errors")
 plt.xlabel("$p$ (Probability of Pauli Error)")
 plt.ylabel("Empirical Probability")
 
-plt.savefig("5-qb.png")
+# plt.savefig("5-qb.png")
 
 plt.show()
 ```
 
-Below is the hard coded data from one run:
+Below is the hard coded data from one run, with 100 examples per $p$ between $0$ and $0.17$ in steps of $0.1$:
 
 ```{code-cell} ipython3
-ys_found = np.array()
+xs_found_1000_5qb = np.array([0.  , 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1 ,
+       0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17])
+ys_found_1000_5qb = np.array([1.   , 0.99 , 0.948, 0.944, 0.867, 0.812, 0.754, 0.68 , 0.666,
+       0.603, 0.526, 0.509, 0.489, 0.439, 0.419, 0.385, 0.38 , 0.333])
 ```
 
 Here is the table for that run:
 
 |   $p$   | percentage |
 |---------|:----------:|
-| $0.00$  |   $1.00$   |
-| $0.01$  |   $0.98$   |
-| $0.02$  |   $0.94$   |
-| $0.03$  |   $0.91$   |
-| $0.04$  |   $0.93$   |
-| $0.05$  |   $0.77$   |
-| $0.06$  |   $0.66$   |
-| $0.07$  |   $0.71$   |
-| $0.08$  |   $0.65$   |
-| $0.09$  |   $0.53$   |
-| $0.10$  |   $0.60$   |
-| $0.11$  |   $0.53$   |
-| $0.12$  |   $0.44$   |
-| $0.13$  |   $0.43$   |
-| $0.14$  |   $0.42$   |
-| $0.15$  |   $0.33$   |
-| $0.16$  |   $0.47$   |
-| $0.17$  |   $0.42$   |
+| $0.00$  |   $1.000$   |
+| $0.01$  |   $0.990$   |
+| $0.02$  |   $0.948$   |
+| $0.03$  |   $0.944$   |
+| $0.04$  |   $0.867$   |
+| $0.05$  |   $0.812$   |
+| $0.06$  |   $0.754$   |
+| $0.07$  |   $0.680$   |
+| $0.08$  |   $0.666$   |
+| $0.09$  |   $0.603$   |
+| $0.10$  |   $0.526$   |
+| $0.11$  |   $0.509$   |
+| $0.12$  |   $0.489$   |
+| $0.13$  |   $0.439$   |
+| $0.14$  |   $0.419$   |
+| $0.15$  |   $0.385$   |
+| $0.16$  |   $0.380$   |
+| $0.17$  |   $0.333$   |
 
 Here is the corresponding graph:
 
-<img src="5-qb.png" alt="Percentage Corrected for One Run"/>
+<img src="5-qb-1000.png" alt="Percentage Corrected for One Run"/>
 
 +++
 
@@ -1022,7 +1096,7 @@ And `error_table` will give the error table:
 ```{code-cell} ipython3
 decode7_dict = error_table(g7_gates_str)
 
-for error, syndrome in decode7_dict.items():          
+for error, syndrome in decode7_dict.items():
     print(f"{error[0]}_{error[1]}: {syndrome}")
 ```
 
@@ -1062,42 +1136,15 @@ add_7_qubit_correction(code7_circuit, code7_circuit.qubits[0:7], code7_circuit.c
 code7_circuit.draw("mpl")
 ```
 
-Let's use `test_error_circuit` to test the error-correction:
+Let's use `test_error_full` to test the error-correction:
 
 ```{code-cell} ipython3
-# change these to test:
-encoded_qubit = 1
-error_gate = "y"
-error_position = 3
-
-test7_circ = test_error_circuit(
-    encoder7, code7_circuit, encoded_qubit, error_gate, error_position, barrier=False
-)
-
-test7_circ.draw("mpl")
+test_error_full(encoder7, g7_gates_str, add_7_qubit_correction)
 ```
 
-Now, we can run the simulation to check:
+Again, it works for every Pauli error in a single qubit.
 
-```{code-cell} ipython3
-simulator = AerSimulator()
-
-# Transpile the circuit for the backend
-compiled_circuit = transpile(test7_circ, simulator)
-
-# Run the circuit -- shot probably could be 1...
-job = simulator.run(compiled_circuit, shots=10)
-
-# Get the measurement counts
-counts = job.result().get_counts()
-counts
-```
-
-We should get back the encoded qubit:
-
-```{code-cell} ipython3
-list(counts.keys())[0].split()[0][::-1] == str(encoded_qubit) + 6 * "0"
-```
++++
 
 ### Generating Function and Testing
 
@@ -1180,7 +1227,7 @@ Let's collect data for different values of $p$ for the Steane's code.  (**Note:*
 
 ```{code-cell} ipython3
 %%time
-max_prob = 0.03
+max_prob = 0.17
 step = 0.01
 
 xs = np.arange(0, max_prob + step, step)
@@ -1196,10 +1243,6 @@ for i, p in enumerate(xs):
         if res:
             count += 1
         ys[i] = count / number_of_tries
-```
-
-```{code-cell} ipython3
-ys
 ```
 
 Here are is the table with the percentage of correctly decoded pairs of qubits:
@@ -1219,40 +1262,43 @@ plt.title("Percentage of Pauli Errors Corrected")
 plt.xlabel("$p$ (Probability of Pauli Error)")
 plt.ylabel("Percentage Corrected")
 
-plt.savefig("steane.png")
+# plt.savefig("steane.png")
 
 plt.show()
 ```
 
-Below is the hard coded data from one run:
+Below is the hard coded data from one run, with $1000$ repetitions per $p$:
 
 ```{code-cell} ipython3
-ys_found = np.array()
+xs_found_1000_steanes = np.array([0.  , 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1 ,
+       0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17])
+ys_found_1000_steanes = np.array([1.   , 0.989, 0.939, 0.894, 0.834, 0.759, 0.701, 0.625, 0.561,
+       0.522, 0.472, 0.437, 0.399, 0.376, 0.321, 0.314, 0.247, 0.255])
 ```
 
 Here is the table for that run:
 
 |   $p$   | percentage |
 |---------|:----------:|
-| $0.00$  |   $1.00$   |
-| $0.01$  |   $0.98$   |
-| $0.02$  |   $0.94$   |
-| $0.03$  |   $0.91$   |
-| $0.04$  |   $0.93$   |
-| $0.05$  |   $0.77$   |
-| $0.06$  |   $0.66$   |
-| $0.07$  |   $0.71$   |
-| $0.08$  |   $0.65$   |
-| $0.09$  |   $0.53$   |
-| $0.10$  |   $0.60$   |
-| $0.11$  |   $0.53$   |
-| $0.12$  |   $0.44$   |
-| $0.13$  |   $0.43$   |
-| $0.14$  |   $0.42$   |
-| $0.15$  |   $0.33$   |
-| $0.16$  |   $0.47$   |
-| $0.17$  |   $0.42$   |
+| $0.00$  |   $1.000$   |
+| $0.01$  |   $0.989$   |
+| $0.02$  |   $0.939$   |
+| $0.03$  |   $0.894$   |
+| $0.04$  |   $0.834$   |
+| $0.05$  |   $0.759$   |
+| $0.06$  |   $0.701$   |
+| $0.07$  |   $0.625$   |
+| $0.08$  |   $0.561$   |
+| $0.09$  |   $0.522$   |
+| $0.10$  |   $0.472$   |
+| $0.11$  |   $0.437$   |
+| $0.12$  |   $0.399$   |
+| $0.13$  |   $0.376$   |
+| $0.14$  |   $0.321$   |
+| $0.15$  |   $0.314$   |
+| $0.16$  |   $0.247$   |
+| $0.17$  |   $0.255$   |
 
 Here is the corresponding graph:
 
-<img src="steane.png" alt="Percentage Corrected for One Run"/>
+<img src="steane-1000.png" alt="Percentage Corrected for One Run"/>
