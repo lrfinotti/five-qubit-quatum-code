@@ -1,0 +1,102 @@
+\documentclass[12pt]{amsart}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FONT ENCODING
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PACKAGES
+
+% Math packages
+\usepackage{amsmath,amsthm,amsfonts,amssymb,mathtools}
+
+% fonts
+\usepackage[mathscr]{eucal} % script
+\usepackage{bbm} % lower case mathbb
+
+% for upright Greek letters
+\usepackage{upgreek}
+
+% graphics
+\usepackage{graphicx}
+
+% diagrams and figures
+\usepackage{tikz}
+% \usetikzlibrary{quantikz}  % quantum gates!
+\usetikzlibrary{quantikz2}
+\usetikzlibrary{cd}  % commutative diagrams
+\usetikzlibrary{angles}
+
+% references
+\usepackage{varioref}
+
+% better lists
+\usepackage[shortlabels]{enumitem}
+% \setlist[enumerate]{itemsep=1.3ex}
+% \setlist[itemize]{itemsep=1.3ex}
+
+% quantum computing
+\usepackage{braket}
+
+% index
+\usepackage{imakeidx}
+\makeindex
+\makeindex[name=not,title=Notation]
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FORMATTING
+
+% page
+\usepackage[textwidth=6in,textheight=8.5in]{geometry}
+
+% paragraph indent
+\setlength{\parindent}{0pt}
+
+% space between paragraphs
+\setlength{\parskip}{1cm plus4mm minus3mm} % default 1cm with + 4mm or
+% -3mm adjustments
+% interline space
+\usepackage{setspace}
+\setstretch{1.33}
+
+\usepackage{hyperref}  % hyperlinks
+\usepackage[poorman,capitalize]{cleveref}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EXTRA SHORTCUTS
+
+\newcommand{\cnot}{\mathrm{CNOT}}  % CNOT gate
+\newcommand{\adj}[1]{#1^{\dagger}}  % adjoint
+\DeclareMathOperator{\U}{U}  % unitary matrices
+\newcommand{\un}{\U_n(\C)}
+\newcommand{\idt}{\mathbb{I}}
+\newcommand{\prob}{\mathbb{P}}
+\newcommand{\ft}{\mathcal{F}}  % Fourier transform
+\DeclareMathOperator{\qft}{QFT}  % quantum Fourier transform
+\DeclareMathOperator{\qpe}{QPE}  % quantum phase estimator
+\DeclareMathOperator{\mmod}{mod}
+\DeclareMathOperator{\swpg}{SWAP}
+\DeclareMathOperator{\cswp}{CSWAP}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\title{Notes on Quantum Computing}
+\author{Luís R.~A.~Finotti}
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT
+
+\begin{document}
+
+\begin{center}
+  \begin{quantikz}
+    \lstick{$\ket{\psi}$} & & \gate{M} & & \\
+    \lstick{$\ket{0}$} & \gate{H} &\ctrl{-1} & \gate{H} & \meter{}
+  \end{quantikz}
+\end{center}
+
+\end{document}
