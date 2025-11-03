@@ -439,12 +439,14 @@ encode_value = 1
 error_gate = "x"
 error_position = 2
 
+n_qubits = len(g_gates_str[0])
+n_syndromes = len(g_gates_str)
 
-quantum_register = QuantumRegister(size=5, name="x")
-checks_register = AncillaRegister(size=4, name="c")
-syndromes = ClassicalRegister(size=4, name="s")
+quantum_register = QuantumRegister(size=n_qubits, name="x")
+checks_register = AncillaRegister(size=n_syndromes, name="c")
+syndromes = ClassicalRegister(size=n_syndromes, name="s")
 
-qubit_measurements = ClassicalRegister(size=5, name="meas")
+qubit_measurements = ClassicalRegister(size=n_qubits, name="meas")
 
 test_circuit = QuantumCircuit(quantum_register, checks_register, syndromes)
 
@@ -472,6 +474,7 @@ test_circuit.barrier()
 
 # decode
 test_circuit.compose(encoder_circ.inverse(), inplace=True)
+test_circuit.barrier()
 
 # measure
 test_circuit.add_register(qubit_measurements)
