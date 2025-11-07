@@ -21,9 +21,6 @@ from qiskit import transpile
 
 import pylatexenc
 
-# for testing
-# from random import random, randint, choice
-
 import numpy as np
 # make numpy output look better
 np_version = int(np.version.version.split(".")[0])
@@ -31,11 +28,8 @@ if np_version >= 2:
     np.set_printoptions(legacy="1.25")
 
 import matplotlib.pyplot as plt
-# %matplotlib inline
 
 # style
-# plt.rcParams['figure.figsize'] = (10, 8)
-# plt.style.use('fivethirtyeight')
 plt.style.use("ggplot")
 ```
 
@@ -819,28 +813,6 @@ def n_qubit_plus_errors_circ(
 
     # random errors
     error_occurred = ["i"] * (n * n_qubits)
-    # for i in range(n * n_qubits):
-    #     rnd = np.random.random(3)
-    #     # X error
-    #     if rnd[0] < p:
-    #         circ.x(quantum_register[i])
-    #         error_occurred[i] = "x"
-    #     # Y error
-    #     if rnd[1] < p:
-    #         circ.y(quantum_register[i])
-    #         if error_occurred[i] == "i":
-    #             error_occurred[i] = "y"
-    #         else:
-    #             error_occurred[i] += "y"
-    #     # Z error
-    #     if rnd[2] < p:
-    #         circ.z(quantum_register[i])
-    #         if error_occurred[i] == "i":
-    #             error_occurred[i] = "z"
-    #         else:
-    #             error_occurred[i] += "z"
-    #     # reverse order to see it as composition (right to left)
-    #     error_occurred[i] = error_occurred[i][::-1]
     for i in range(n * n_qubits):
         rnd = np.random.random()
         if rnd < 3 * p:
